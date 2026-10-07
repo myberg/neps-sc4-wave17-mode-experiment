@@ -1,0 +1,25 @@
+# Local configuration
+config_local.R
+
+# R/RStudio
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Restricted data
+data/derived/
+data/raw/
+*.dta
+*.sav
+*.por
+*.RData
+*.rds
+
+# Generated outputs (commit selected final outputs deliberately if desired)
+output/*
+!output/.gitkeep
+
+# OS/editor
+.DS_Store
+Thumbs.db
