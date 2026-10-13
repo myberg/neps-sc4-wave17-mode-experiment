@@ -104,4 +104,4 @@ Duplicate execution scripts, multiple-imputation development code, obsolete appe
 ## Citation
 
 A machine-readable citation file is provided in `CITATION.cff`.
-[![DOI](https://zenodo.org/badge/1408645195.svg)](https://doi.org/10.5281/zenodo.23336434)
+[![DOI: 10.5281/zenodo.23336434](https://zenodo.org/badge/1408645195.svg)](https://doi.org/10.5281/zenodo.23336434)
