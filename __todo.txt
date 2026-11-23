@@ -1,0 +1,90 @@
+Ja, ein paar Dinge würde ich direkt auf GitHub sauber setzen. Viel ist es aber nicht.
+
+Ich würde beim neuen Repo `neps-sc4-mode-experiment` Folgendes erledigen:
+
+- **Visibility:** zunächst `Private`, erst unmittelbar vor Submission auf `Public`.
+- **Description:** z. B.  
+  `Replication code for the NEPS SC4 Wave 17 randomized mode experiment on participation and selectivity.`
+- **Topics:** etwa `neps`, `survey-methodology`, `panel-survey`, `nonresponse`, `mode-experiment`, `r`, `reproducible-research`.
+- **README.md:** Titel des Papers, kurze Beschreibung, Datenzugang, Repository-Struktur, Ausführungsreihenfolge und Hinweis auf SUF 17.0.0.
+- **LICENSE:** MIT.
+- **CITATION.cff:** Autoren, Titel, Repository-Typ; Paper-DOI und Zenodo-DOI später ergänzen.
+- **`.gitignore`:** insbesondere Daten und lokale Dateien ausschließen, etwa:
+  ```gitignore
+  .Rhistory
+  .RData
+  .Rproj.user/
+  *.Rproj
+  .Renviron
+
+  data/raw/
+  data/derived/*
+  !data/derived/.gitkeep
+
+  output/*
+  !output/.gitkeep
+  ```
+  Falls du finale Tabellen/Grafiken bewusst veröffentlichen willst, natürlich die entsprechenden `output/`-Regeln anpassen.
+- **Keine Wiki/Projects nötig.** Wenn du sie nicht verwendest, kannst du sie unter `Settings → General → Features` deaktivieren. Issues kannst du offenlassen; das ist bei einem Replication Repo durchaus sinnvoll.
+- **Default branch:** `main`.
+- **Repository-Struktur prüfen:** GitHub sollte beim Öffnen ungefähr so aussehen:
+  ```text
+  README.md
+  LICENSE
+  CITATION.cff
+  00_run_analysis.R
+  R/
+  data/
+  environment/
+  output/
+  ```
+- **Vor Public-Schaltung:** einmal GitHub-Suche im Repo nach verdächtigen Begriffen machen, z. B. `C:/`, `Z:/`, `CASEID`, `ID_t`, `MYCP`, `token`, `password`, `secret`, `@lifbi`, damit nichts Internes versehentlich geblieben ist.
+- **Submission Release:** wenn alles eingefroren ist, einen Release erstellen, etwa  
+  `v1.0.0 - Submission version`
+  mit einem Git-Tag `v1.0.0`.
+
+Danach würde ich **erst Zenodo anbinden**. Zenodo archiviert dann genau den GitHub-Release und vergibt dafür den DOI. Diesen DOI kannst du anschließend in `CITATION.cff`, README und Manuskript eintragen.
+
+Eine Sache würde ich **nicht** machen: das GitHub-Repo mit dem Manuskript-PDF vollpacken. Das Repo sollte als **Code-/Replication-Repository** erkennbar bleiben. Manuskript und Supplement gehören zur Journal-Submission; GitHub enthält den Code und die notwendige Dokumentation.
+
+Der nächste sinnvolle Schritt wäre für mich jetzt tatsächlich, deine `.gitignore`, `README.md` und `CITATION.cff` einmal gemeinsam auf den finalen Stand zu bringen.
+
+
+#######
+
+Ja, das geht recht unkompliziert. Der saubere Weg ist:
+
+1. **GitHub-Repo fertig machen und öffentlich schalten.**
+2. Bei Zenodo einloggen und dein **GitHub-Konto verknüpfen**. In Zenodo findest du das unter deinem Profil bei den verknüpften Accounts bzw. direkt im GitHub-Bereich. [Zenodo](https://help.zenodo.org/docs/profile/linking-accounts/?utm_source=chatgpt.com)
+3. In Zenodo auf **GitHub** gehen, `Sync now` klicken und dein Repository `neps-sc4-mode-experiment` aktivieren. Ab dann kann Zenodo neue GitHub-Releases automatisch archivieren. [Zenodo](https://help.zenodo.org/docs/github/enable-repository/?utm_source=chatgpt.com)
+4. Auf GitHub einen Release erstellen, z. B.:
+   - Tag: `v1.0.0`
+   - Titel: `Submission version`
+   - Release notes: kurzer Hinweis, dass dies der Stand bei Manuskripteinreichung ist.
+5. Sobald du den GitHub-Release veröffentlichst, übernimmt Zenodo diesen Release und legt daraus einen Software-Datensatz an. Zenodo archiviert dabei die Release-Version und vergibt beim Publizieren einen DOI. [Zenodo](https://help.zenodo.org/docs/github/?utm_source=chatgpt.com)
+6. Danach auf Zenodo noch einmal die Metadaten prüfen: Titel, Autoren, ORCID, Beschreibung, Lizenz, Keywords, ggf. related publication.
+
+Ich würde vor dem ersten Release unbedingt noch eine `CITATION.cff` ins Repo legen. Zenodo kann daraus Software-Metadaten übernehmen. Eine `.zenodo.json` brauchst du nur, wenn du speziellere Zenodo-Felder wie Funding, Communities oder `related_identifiers` steuern willst; wenn beide vorhanden sind, hat `.zenodo.json` Vorrang. [Zenodo](https://help.zenodo.org/docs/github/describe-software/?utm_source=chatgpt.com)
+
+Für dein Projekt würde ich den Release etwa so nennen:
+
+```text
+v1.0.0 – Submission version
+```
+
+und als Beschreibung:
+
+```text
+Replication code for:
+Participation and Selectivity in Web-Based Cognitive Testing and Surveying:
+Evidence from a Randomized Mode Experiment
+
+This release corresponds to the version of the analysis code used for
+journal submission. The underlying NEPS SC4 Wave 17 data were not yet
+available as Scientific Use File 17.0.0 at the time of submission and are
+therefore not included.
+```
+
+Ein wichtiger Punkt: Wenn du die **GitHub–Zenodo-Integration** nutzt, kannst du den DOI nicht schon vor dem ersten GitHub-Release reservieren. Das geht nur bei einem manuellen Zenodo-Upload. [Zenodo](https://support.zenodo.org/help/en-gb/24-github-integration/73-can-i-pre-reserved-a-doi-before-a-github-release?utm_source=chatgpt.com)
+
+Für dich würde ich daher so vorgehen: GitHub public → Zenodo verbinden → `v1.0.0` releasen → Zenodo-Datensatz prüfen → DOI ins README und ins Manuskript eintragen. Später, wenn SUF 17.0.0 da ist, machst du `v2.0.0`; Zenodo archiviert dann die neue Version separat.
