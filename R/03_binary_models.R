@@ -1,24 +1,45 @@
-# ===
-# Stage-specific binary logit models
-# Participation and Selectivity in Web-Based Cognitive Testing and Surveying:
-# Evidence from a Randomized Mode Experiment
+####
+# Konstruktion der Experimentalgruppen für das Incentive Experiment 
+# in der B160 (SC4, Welle 17)
 #
-# Requires `00_run_analysis.R` and `R/00_functions.R`.
-# The analytical commands are preserved; only paths, obsolete diagnostics,
-# and presentation-level wording were cleaned.
-# ===
+# Vorbereitung Veröffentlichung zur B160
+#
+# Aßmann Christian, Bergrab Michael, Gnambs Timo
+#
+#
+###
+
+# Auswertung des Experiments
+# Modullierung von Logit und Probit-Modellen
+
+
+
+# In 00 execution master.R
+# Packages
+# Pfade
+# Laden Daten
+
+# Im 00 functions.R
+# sämtliche Funktionen
+
+
+
 
 # Überblick ------------------------------------------------------------------
 
 
 # Datensatz definieren
+AuswertungB160.deskriptiv
 
 # aber die wenigen unknown Fälle in ISCED bzw. CASMIN führen zu sehr hohen Schätzergebnissen,
 # daher
 dat_analysis_main <- AuswertungB160.deskriptiv %>% 
-  filter(ISCED_suf != "unbekannt")
+  filter(!is.na(ISCEDNA))
+
+
 
 # names(dat_analysis)
+skimr::skim(dat_analysis_main)
 
 # unter 4. Sensitivity wird u.a. mit dem full dataset gearbeitet.
 # weitere siehe 4. direkt
@@ -40,8 +61,31 @@ dat_analysis_main$Berufliche_Stellung[is.na(dat_analysis_main$Berufliche_Stellun
 #dat_analysis_main[is.na(dat_analysis_main$SWITCH), ]
 
 
-# Common adjusted analysis sample: exclude unknown birth cohort / ISCED
-# (six cases in the analysis used for the manuscript).
+names(dat_analysis_main)
+table(dat_analysis_main$CASMIN, exclude = NULL)
+
+
+# Complete cases = 
+# keine unbekannt in Alter_suf, ISCED_suf,
+
+# überschneiden sich die unknowns?
+dat_analysis_main %>% 
+  summarise(
+    n_age_unknown = sum(Alter_suf == "unbekannt", na.rm = TRUE),
+    n_isced_unknown = sum(ISCED_suf == "unbekannt", na.rm = TRUE),
+    n_either = sum(
+      Alter_suf == "unbekannt" | 
+        ISCED_suf == "unbekannt",
+      na.rm = TRUE
+    ),
+    n_both = sum(
+      Alter_suf == "unbekannt" & 
+        ISCED_suf == "unbekannt",
+      na.rm = TRUE
+    )
+  )
+
+# ERGO
 dat_analysis_main <- dat_analysis_main %>% 
   filter(
     Alter_suf != "unbekannt",
@@ -116,7 +160,7 @@ rhs_specs_heterogeneity <- list(
     "Gender_suf",
     "Alter_suf",
     "Region_suf",
-    "migBG_suf",
+    "migBG",
     "ISCED_suf",
     "Erwerbstätigkeit_aktuell",
     "valid_comp_w10",
@@ -131,7 +175,7 @@ rhs_specs_heterogeneity <- list(
     "Gender_suf",
     "Alter_suf",
     "Region_suf",
-    "migBG_suf",
+    "migBG",
     "ISCED_suf",
     "Erwerbstätigkeit_aktuell",
     "valid_comp_w10",
@@ -146,7 +190,7 @@ rhs_specs_heterogeneity <- list(
     "Gender_suf",
     "Alter_suf",
     "Region_suf",
-    "migBG_suf",
+    "migBG",
     "Erwerbstätigkeit_aktuell",
     "valid_comp_w10",
     "status.16",
@@ -160,7 +204,7 @@ rhs_specs_heterogeneity <- list(
     "part_hist",
     "Alter_suf",
     "Region_suf",
-    "migBG_suf",
+    "migBG",
     "Erwerbstätigkeit_aktuell",
     "valid_comp_w10",
     "status.16",
@@ -254,12 +298,28 @@ formulas_y3_heterogeneity <- lapply(rhs_specs_heterogeneity, function(vars) {
 
 # 1.2 Estimates -----------------------------------------------------------
 
+# LOGIT TBT
+# models_Y_TBT <- fit_logit_specs(
+#   data = dat_main,
+#   outcome = "Y_TBT",
+#   rhs_specs = rhs_specs,
+#   common_sample = TRUE
+# )
+
 models_y1 <- lapply(
   formulas_y1,
   FUN = fit_logit,
   data = dat_analysis_main
 )
 
+
+# LOGIT Befragung
+# models_Y_Befragung <- fit_logit_specs(
+#   data = dat_main,
+#   outcome = "Y_Befragung",
+#   rhs_specs = rhs_specs,
+#   common_sample = TRUE
+# )
 models_y2 <- lapply(
   formulas_y2,
   FUN = fit_logit,
@@ -272,6 +332,12 @@ dat_analysis_interview <- dat_analysis_main %>%
   filter(Y_Befragung == 1) %>% 
   droplevels()
 
+# models_Y_CAWI_nachgelagert <- fit_logit_specs(
+#   data = dat_main_interview,
+#   outcome = "Y_CAWI_nachgelagert",
+#   rhs_specs = rhs_specs,
+#   common_sample = TRUE
+# )
 models_y3 <- lapply(
   formulas_y3,
   FUN = fit_logit,
@@ -281,18 +347,15 @@ models_y3 <- lapply(
 
 
 coef_Y_TBT <- coef_table_models(models_y1, "Valid competence test")
-coef_Y_Befragung <- coef_table_models(models_y2, "Interview started")
-coef_Y_CAWI_nachgelagert <- coef_table_models(models_y3, "Follow-up CAWI | interview starters")
+coef_Y_Befragung <- coef_table_models(models_y2, "Interview realised")
+coef_Y_CAWI_nachgelagert <- coef_table_models(models_y3, "Follow-up CAWI | realised interviews")
 
 coef_all_logit <- bind_rows(coef_Y_TBT,
                       coef_Y_Befragung,
                       coef_Y_CAWI_nachgelagert)
-
-# Output: Table
-# Title: Logit coefficient estimates for the fully adjusted stage-specific models (M6) 
-# LaTeX label: tab:main_logit_coefficients
+# abspeichern für APPENDIX
 write.csv(coef_all_logit, 
-          file.path(path.save, "supplement_logit_coefficients.csv"), 
+          file.path(path.save, "appendix_logit_coefficients.csv"), 
           row.names = FALSE)
 
 
@@ -328,20 +391,15 @@ models_y3_heterogeneity <- lapply(
 
 # zusammenfassen
 coef_Y_TBT_heterogeneity <- coef_table_models(models_y1_heterogeneity, "Valid competence test")
-coef_Y_Befragung_heterogeneity <- coef_table_models(models_y2_heterogeneity, "Interview started")
-coef_Y_CAWI_nachgelagert_heterogeneity <- coef_table_models(models_y3_heterogeneity, "Follow-up CAWI | interview starters")
+coef_Y_Befragung_heterogeneity <- coef_table_models(models_y2_heterogeneity, "Interview realised")
+coef_Y_CAWI_nachgelagert_heterogeneity <- coef_table_models(models_y3_heterogeneity, "Follow-up CAWI | realised interviews")
 
 coef_all_logit_heterogeneity <- bind_rows(coef_Y_TBT_heterogeneity,
                             coef_Y_Befragung_heterogeneity,
                             coef_Y_CAWI_nachgelagert_heterogeneity)
-
-# Output: Table
-# Title: Logit coefficient estimates for heterogneity (M2 -- M4) 
-# LaTeX label: tab:coef_h2_comp_history
-# LaTeX label: tab:coef_h3_education
-# LaTeX label: tab:coef_h4_gender
+# abspeichern für APPENDIX
 write.csv(coef_all_logit_heterogeneity, 
-          file.path(path.save, "supplement_logit_coefficients_heterogeneity.csv"), 
+          file.path(path.save, "appendix_logit_coefficients_heterogeneity.csv"), 
           row.names = FALSE)
 
 
@@ -360,7 +418,7 @@ modelsummary::modelsummary(
   # vcov = function(x) sandwich::vcovHC(x, type = "HC2"),
   stars = TRUE,
   output = "markdown",
-  title = "M6 | Interview start"
+  title = "M6 | Interview realised"
 )
 modelsummary::modelsummary(
   models_y3_heterogeneity$H1_panel_engagement,
@@ -384,7 +442,7 @@ modelsummary::modelsummary(
   # vcov = function(x) sandwich::vcovHC(x, type = "HC2"),
   stars = TRUE,
   output = "markdown",
-  title = "H2 | Interview start"
+  title = "H2 | Interview realised"
 )
 modelsummary::modelsummary(
   models_y3_heterogeneity$H2_competence_history,
@@ -408,7 +466,7 @@ modelsummary::modelsummary(
   # vcov = function(x) sandwich::vcovHC(x, type = "HC2"),
   stars = TRUE,
   output = "markdown",
-  title = "H3 | Interview start"
+  title = "H3 | Interview realised"
 )
 modelsummary::modelsummary(
   models_y3_heterogeneity$H3_education,
@@ -432,7 +490,7 @@ modelsummary::modelsummary(
   # vcov = function(x) sandwich::vcovHC(x, type = "HC2"),
   stars = TRUE,
   output = "markdown",
-  title = "H4 | Interview start"
+  title = "H4 | Interview realised"
 )
 modelsummary::modelsummary(
   models_y3_heterogeneity$H4_gender,
@@ -445,8 +503,8 @@ modelsummary::modelsummary(
 # 1.2 Information criteria ------------------------------------------------
 
 ic_Y_TBT <- info_criteria(models_y1, "Valid competence test")
-ic_Y_Befragung <- info_criteria(models_y2, "Interview started")
-ic_Y_CAWI_nachgelagert <- info_criteria(models_y3, "Follow-up CAWI | interview starters")
+ic_Y_Befragung <- info_criteria(models_y2, "Interview realised")
+ic_Y_CAWI_nachgelagert <- info_criteria(models_y3, "Follow-up CAWI | realised interviews")
 
 ic_all_logit <- dplyr::bind_rows(ic_Y_TBT, ic_Y_Befragung, ic_Y_CAWI_nachgelagert)
 
@@ -462,10 +520,7 @@ ic_table_logit  <- ic_all_logit %>%
     delta_BIC = round(delta_BIC, 1)
   )
 
-# Output: Table
-# Title: Information criteria for the nested stage-specific logit models
-# LaTeX label: tab:stage_model_information_criteria
-# abspeichern für SUPPLEMENT
+# abspeichern für APPENDIX
 readr::write_csv(ic_table_logit, 
                  file.path(path.save, "model_comparison_information_criteria.csv"))
 
@@ -486,8 +541,8 @@ ic_table_logit %>%
 # 1.3 Likelihood ratio test -----------------------------------------------
 
 lr_Y_TBT <- lr_tests(models_y1, "Valid competence test", lr_sequence)
-lr_Y_Befragung <- lr_tests(models_y2, "Interview started", lr_sequence)
-lr_Y_CAWI_nachgelagert <- lr_tests(models_y3, "Follow-up CAWI | interview starters", lr_sequence)
+lr_Y_Befragung <- lr_tests(models_y2, "Interview realised", lr_sequence)
+lr_Y_CAWI_nachgelagert <- lr_tests(models_y3, "Follow-up CAWI | realised interviews", lr_sequence)
 
 lr_all_logit <- dplyr::bind_rows(lr_Y_TBT, lr_Y_Befragung, lr_Y_CAWI_nachgelagert)
 lr_table_logit <- lr_all_logit %>% 
@@ -496,10 +551,7 @@ lr_table_logit <- lr_all_logit %>%
     p_value = signif(p_value, 3)
   )
 
-# Output: Table
-# Title: Sequential likelihood-ratio tests for the nested stage-specific logit models.
-# LaTeX label: tab:stage_model_lr_tests
-# abspeichern für SUPPLEMENT
+# abspeichern für APPENDIX
 readr::write_csv(lr_table_logit, 
                  file.path(path.save, "model_comparison_LikelihoodRatioTest.csv"))
 
@@ -527,22 +579,22 @@ pred_pref <- dplyr::bind_rows(
   get_mode_predictions(
     m_pref_Y_Befragung,
     "M6_full_pre_fieldwork",
-    "Interview started"
+    "Interview realised"
   ),
   get_mode_predictions(
     m_pref_Y_CAWI_nachgelagert,
     "M6_full_pre_fieldwork",
-    "Follow-up CAWI | interview starters"
+    "Follow-up CAWI | realised interviews"
   )
 )
 
 pred_pref_table <- pred_pref %>% 
   dplyr::mutate(
-    estimate_pct = 100 * estimate,
+    estiamte_pct = 100 * estimate,
     conf.low_pct = 100 * conf.low,
     conf.high_pct = 100 * conf.high,
     cell = paste0(
-      sprintf("%.1f", estimate_pct),
+      sprintf("%.1f", estiamte_pct),
       " [",
       sprintf("%.1f", conf.low_pct),
       ", ",
@@ -566,9 +618,8 @@ pred_pref_table %>%
   ) %>% 
   kable_styling(latex_options = c("hold_position"))
 
-# Output: Table
-# Title: adjusted predicted probabilities
-# LaTeX label: tab:stage_predprob
+# table: adjusted predicted probabilities
+# tab:stage_predprob
 
 
 
@@ -585,22 +636,22 @@ contr_pref <- dplyr::bind_rows(
   get_all_pairwise_contrasts(
     m_pref_Y_Befragung,
     conf_level = 0.95,
-    "Interview started"),
+    "Interview realised"),
   get_all_pairwise_contrasts(
     m_pref_Y_CAWI_nachgelagert,
     conf_level = 0.95,
-    "Follow-up CAWI | interview starters")
+    "Follow-up CAWI | realised interviews")
 )
 
 
 contr_pref %>% 
   dplyr::select(outcome, contrast, estimate, conf.low, conf.high) %>% 
   dplyr::mutate(
-    estimate_pct = 100 * estimate,
+    estiamte_pct = 100 * estimate,
     conf.low_pct = 100 * conf.low,
     conf.high_pct = 100 * conf.high,
     cell = paste0(
-      sprintf("%.1f", estimate_pct),
+      sprintf("%.1f", estiamte_pct),
       " [",
       sprintf("%.1f", conf.low_pct),
       ", ",
@@ -623,10 +674,7 @@ contr_pref %>%
   kable_styling(latex_options = c("hold_position"))
 
 # In TABELLE tab:stage_predprob
-# Output: Table
-# Title: adjusted predicted probabilities
-# LaTeX label: tab:stage_predprob
-
+  
 
 contr_pref %>% 
   dplyr::select(outcome, contrast, equivalence_result) %>% 
@@ -645,9 +693,6 @@ contr_pref %>%
 
 # In TABELLE stage_predprob
 # dritte Spalte
-# Output: Table
-# Title: adjusted predicted probabilities
-# LaTeX label: tab:stage_predprob
 
 # N für y3 für die Fußnote in der Tabelle stage_predprob
 n_y3 <- stats::nobs(
@@ -667,12 +712,12 @@ contr_pref_eq3 <- dplyr::bind_rows(
     equivalence_margin_pp = 3,
     m_pref_Y_Befragung,
     conf_level = 0.90,
-    "Interview started"),
+    "Interview realised"),
   get_all_pairwise_contrasts(
     equivalence_margin_pp = 3,
     m_pref_Y_CAWI_nachgelagert,
     conf_level = 0.90,
-    "Follow-up CAWI | interview starters")
+    "Follow-up CAWI | realised interviews")
 )
 
 contr_pref_eq3 %>% 
@@ -689,12 +734,12 @@ contr_pref_eq75 <- dplyr::bind_rows(
     equivalence_margin_pp = 7.5,
     m_pref_Y_Befragung,
     conf_level = 0.90,
-    "Interview started"),
+    "Interview realised"),
   get_all_pairwise_contrasts(
     equivalence_margin_pp = 7.5,
     m_pref_Y_CAWI_nachgelagert,
     conf_level = 0.90,
-    "Follow-up CAWI | interview starters")
+    "Follow-up CAWI | realised interviews")
 )
 
 
@@ -708,9 +753,117 @@ contr_pref_eq75 %>%
 
 # In TABELLE Appendix
 # label: tab:equivalence_margin_sensitivity
-# Output: Table
-# Title: Sensitivity of equivalence conclusions to alternative equivalence margins
-# LaTeX label: tab:equivalence_margin_sensitivity
+
+# 1.5 Assignment contrasts relativ to CAPI --------------------------------
+# 
+# contr_pref <- dplyr::bind_rows(
+#   get_assignment_contrasts(
+#     m_pref_Y_TBT,
+#     "M3_preferred_interaction",
+#     "Valid competence test"
+#   ),
+#   get_assignment_contrasts(
+#     m_pref_Y_Befragung,
+#     "M3_preferred_interaction",
+#     "Interview started"
+#   ),
+#   get_assignment_contrasts(
+#     m_pref_Y_CAWI_nachgelagert,
+#     "M3_preferred_interaction",
+#     "Follow-up CAWI | interview starters"
+#   )
+# )
+# 
+# unique(contr_pref$contrast)
+# 
+# contr_pref_CAPI <- contr_pref %>% 
+#   dplyr::filter(stringr::str_detect(contrast, "CAPI"))
+# 
+# contr_pref_table <- contr_pref_CAPI %>% 
+#   dplyr::mutate(
+#     estiamte_pp = 100 * estimate,
+#     conf.low_pp = 100 * conf.low,
+#     conf.high_pp = 100 * conf.high,
+#     cell = paste0(
+#       sprintf("%.1f", estiamte_pp),
+#       " [",
+#       sprintf("%.1f", conf.low_pp),
+#       ", ",
+#       sprintf("%.1f", conf.high_pp),
+#       "]"
+#     )
+#   ) %>% 
+#   dplyr::select(outcome, contrast, cell) %>% 
+#   tidyr::pivot_wider(
+#     names_from = contrast,
+#     values_from = cell
+#   )
+# 
+# contr_pref_table %>% 
+#   kable(# format = "latex",
+#     booktabs = TRUE,
+#     escape = FALSE,
+#     caption = "",
+#     label = "tab:pred-pref-table-logit",
+#     align = "lccc"
+#   ) %>% 
+#   kable_styling(latex_options = c("hold_position"))
+# 
+# 
+# 
+# # Ausgabe optimieren ------------------------------------------------------
+# 
+# pred_wide <- pred_pref %>% 
+#   dplyr::mutate(
+#     cell = paste0(
+#       sprintf("%.1f", 100 * estimate),
+#       " [",
+#       sprintf("%.1f", 100 * conf.low),
+#       ", ",
+#       sprintf("%.1f", 100 * conf.high),
+#       "]"
+#     )
+#   ) %>% 
+#   dplyr::select(outcome, STARTMODE, cell) %>% 
+#   tidyr::pivot_wider(
+#     names_from = STARTMODE,
+#     values_from = cell
+#   )
+# 
+# contr_wide <- contr_pref_CAPI %>% 
+#   dplyr::mutate(
+#     contrast_clean = dplyr::case_when(
+#       stringr::str_detect(contrast, "CALVI") ~ "CALVI_minus_CAPI",
+#       stringr::str_detect(contrast, "CAWI") ~ "CAWI_minus_CAPI",
+#       TRUE ~ contrast
+#     ),
+#     cell = paste0(
+#       sprintf("%.1f", 100 * estimate),
+#       " [",
+#       sprintf("%.1f", 100 * conf.low),
+#       ", ",
+#       sprintf("%.1f", 100 * conf.high),
+#       "]"
+#     )
+#   ) %>% 
+#   dplyr::select(outcome, contrast_clean, cell) %>% 
+#   tidyr::pivot_wider(
+#     names_from = contrast_clean, 
+#     values_from = cell)
+# 
+# stage_results_table <- pred_wide %>% 
+#   dplyr::left_join(contr_wide, by = "outcome")
+# 
+# 
+# stage_results_table %>% 
+#   kable(# format = "latex",
+#     booktabs = TRUE,
+#     escape = FALSE,
+#     caption = "",
+#     label = "tab:pred-pref-table-logit",
+#     align = "lccc"
+# ) %>% 
+#   kable_styling(latex_options = c("hold_position"))
 
 
 
@@ -732,7 +885,7 @@ pred_group <- dplyr::bind_rows(
   ),
   get_cf_predictions(
     m_pref_Y_Befragung,
-    "Interview started",
+    "Interview realised",
     assignment_var = "STARTMODE",
     group_var = "status.16"
   ),
@@ -748,7 +901,7 @@ pred_group <- dplyr::bind_rows(
 
 pred_group$outcome <- factor(pred_group$outcome,
                              levels = c("Valid competence test",
-                                        "Interview started",
+                                        "Interview realised",
                                         "Follow-up CAWI (conditional)"))
 
 pred_group$STARTMODE <- factor(pred_group$STARTMODE,
@@ -779,8 +932,8 @@ mode_labels <- c(
 
 outcome_labels <- c(
   "Valid competence test" = "Valid competence-test data",
-  "Interview started" = "Interview start",
-  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong interview starters"
+  "Interview realised" = "Interview realised",
+  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong realised interviews"
 )
 
 status_levels <- c(
@@ -830,7 +983,7 @@ p_prior_panel <- ggplot2::ggplot(
   scale_y_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = 0.25),
-    labels = scales::label_percent(accuracy = 1),
+    labels = label_percent(accuracy = 1),
     expand = expansion(mult = c(0, 0.015))
   ) +
   scale_shape_manual(
@@ -874,7 +1027,7 @@ p_prior_panel
 # abspeichern
 ggplot2::ggsave(
   plot  = p_prior_panel,
-  filename = file.path(path.save, "Predicted probabilities prior panel history.pdf"),
+  filename = file.path(path.save, "Predicted probablities prior panel history.pdf"),
   device = cairo_pdf,
   width = 180,
   height = 105,
@@ -905,7 +1058,7 @@ panel_status_pred_results <- dplyr::bind_rows(
   ),
   get_binary_group_table(
     model = m_pref_Y_Befragung,
-    outcome_label = "Interview started",
+    outcome_label = "Interview realised",
     mode_pairs = mode_pairs,
     group_var = "status.16",
     reference_group = "Part",
@@ -979,7 +1132,7 @@ pred_group_prior_comp <- dplyr::bind_rows(
   ),
   get_cf_predictions(
     models_y2_heterogeneity$H2_competence_history,
-    "Interview started",
+    "Interview realised",
     assignment_var = "STARTMODE",
     group_var = "valid_comp_w14"
   ),
@@ -994,7 +1147,7 @@ pred_group_prior_comp <- dplyr::bind_rows(
 # plotten:
 pred_group_prior_comp$outcome <- factor(pred_group_prior_comp$outcome,
                              levels = c("Valid competence test",
-                                        "Interview started",
+                                        "Interview realised",
                                         "Follow-up CAWI (conditional)"))
 
 pred_group_prior_comp$STARTMODE <- factor(pred_group_prior_comp$STARTMODE,
@@ -1025,8 +1178,8 @@ mode_labels <- c(
 
 outcome_labels <- c(
   "Valid competence test" = "Valid competence-test data",
-  "Interview started" = "Interview start",
-  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong interview starters"
+  "Interview realised" = "Interview realised",
+  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong realised interviews"
 )
 
 status_levels <- c(
@@ -1076,7 +1229,7 @@ p_prior_comp <- ggplot2::ggplot(
   scale_y_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = 0.25),
-    labels = scales::label_percent(accuracy = 1),
+    labels = label_percent(accuracy = 1),
     expand = expansion(mult = c(0, 0.015))
   ) +
   scale_shape_manual(
@@ -1120,7 +1273,7 @@ p_prior_comp
 # abspeichern
 ggplot2::ggsave(
   plot  = p_prior_comp,
-  filename = file.path(path.save, "Predicted probabilities prior competence test w14.pdf"),
+  filename = file.path(path.save, "Predicted probablities prior competence test w14.pdf"),
   device = cairo_pdf,
   width = 180,
   height = 105,
@@ -1150,7 +1303,7 @@ pred_results_prior_comp <- dplyr::bind_rows(
   ),
   get_binary_group_table(
     model = models_y2_heterogeneity$H2_competence_history,
-    outcome_label = "Interview started",
+    outcome_label = "Interview realised",
     mode_pairs = mode_pairs,
     group_var = "valid_comp_w14",
     reference_group = "0",
@@ -1235,7 +1388,7 @@ pred_group_ISCED <- dplyr::bind_rows(
   ),
   get_cf_predictions(
     models_y2_heterogeneity$H3_education,
-    "Interview started",
+    "Interview realised",
     assignment_var = "STARTMODE",
     group_var = "ISCED_suf"
   ),
@@ -1250,7 +1403,7 @@ pred_group_ISCED <- dplyr::bind_rows(
 # plotten:
 pred_group_ISCED$outcome <- factor(pred_group_ISCED$outcome,
                                         levels = c("Valid competence test",
-                                                   "Interview started",
+                                                   "Interview realised",
                                                    "Follow-up CAWI (conditional)"))
 
 pred_group_ISCED$STARTMODE <- factor(pred_group_ISCED$STARTMODE,
@@ -1282,8 +1435,8 @@ mode_labels <- c(
 
 outcome_labels <- c(
   "Valid competence test" = "Valid competence-test data",
-  "Interview started" = "Interview start",
-  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong interview starters"
+  "Interview realised" = "Interview realised",
+  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong realised interviews"
 )
 
 status_levels <- c(
@@ -1336,7 +1489,7 @@ p_ISCED <- ggplot2::ggplot(
   scale_y_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = 0.25),
-    labels = scales::label_percent(accuracy = 1),
+    labels = label_percent(accuracy = 1),
     expand = expansion(mult = c(0, 0.015))
   ) +
   scale_shape_manual(
@@ -1383,7 +1536,7 @@ p_ISCED
 # abspeichern
 ggplot2::ggsave(
   plot  = p_ISCED,
-  filename = file.path(path.save, "Predicted probabilities ISCED.pdf"),
+  filename = file.path(path.save, "Predicted probablities ISCED.pdf"),
   device = cairo_pdf,
   width = 180,
   height = 105,
@@ -1409,7 +1562,7 @@ isced_levels <- c(
   "0-2", "3-4", "5-6"
 )
 
-levels(model.frame(models_y1_heterogeneity$H3_education)$ISCED_suf)
+levels(model.frame(models_y1_heterogeneity$H3_education)$ISCED)
 
 pred_isced <- dplyr::bind_rows(
   get_multigroup_table(
@@ -1421,7 +1574,7 @@ pred_isced <- dplyr::bind_rows(
   ),
   get_multigroup_table(
     model = models_y2_heterogeneity$H3_education,
-    outcome_label = "Interview started",
+    outcome_label = "Interview realised",
     mode_pairs = mode_pairs,
     group_var = "ISCED_suf",
     group_levels = isced_levels
@@ -1499,7 +1652,7 @@ pred_group_gender <- dplyr::bind_rows(
   ),
   get_cf_predictions(
     models_y2_heterogeneity$H4_gender,
-    "Interview started",
+    "Interview realised",
     assignment_var = "STARTMODE",
     group_var = "Gender_suf"
   ),
@@ -1514,7 +1667,7 @@ pred_group_gender <- dplyr::bind_rows(
 # plotten:
 pred_group_gender$outcome <- factor(pred_group_gender$outcome,
                                         levels = c("Valid competence test",
-                                                   "Interview started",
+                                                   "Interview realised",
                                                    "Follow-up CAWI (conditional)"))
 
 pred_group_gender$STARTMODE <- factor(pred_group_gender$STARTMODE,
@@ -1545,8 +1698,8 @@ mode_labels <- c(
 
 outcome_labels <- c(
   "Valid competence test" = "Valid competence-test data",
-  "Interview started" = "Interview start",
-  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong interview starters"
+  "Interview realised" = "Interview realised",
+  "Follow-up CAWI (conditional)" = "Follow-up CAWI\namong realised interviews"
 )
 
 status_levels <- c(
@@ -1596,7 +1749,7 @@ p_prior_gender <- ggplot2::ggplot(
   scale_y_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = 0.25),
-    labels = scales::label_percent(accuracy = 1),
+    labels = label_percent(accuracy = 1),
     expand = expansion(mult = c(0, 0.015))
   ) +
   scale_shape_manual(
@@ -1640,7 +1793,7 @@ p_prior_gender
 # abspeichern
 ggplot2::ggsave(
   plot  = p_prior_gender,
-  filename = file.path(path.save, "Predicted probabilities gender.pdf"),
+  filename = file.path(path.save, "Predicted probablities gender.pdf"),
   device = cairo_pdf,
   width = 180,
   height = 105,
@@ -1671,7 +1824,7 @@ pred_results_gender <- dplyr::bind_rows(
   ),
   get_binary_group_table(
     model = models_y2_heterogeneity$H4_gender,
-    outcome_label = "Interview started",
+    outcome_label = "Interview realised",
     mode_pairs = mode_pairs,
     group_var = "Gender_suf",
     reference_group = "männlich",
@@ -1733,7 +1886,7 @@ options(
 models_h1_panel <- list(
   "Valid competence-test data" = 
     models_y1_heterogeneity$H1_panel_engagement,
-  "Interview start" = 
+  "Interview realised" = 
     models_y2_heterogeneity$H1_panel_engagement,
   "Follow-up CAWI" = 
     models_y3_heterogeneity$H1_panel_engagement
@@ -1742,7 +1895,7 @@ models_h1_panel <- list(
 models_h2_comp <- list(
   "Valid competence-test data" = 
     models_y1_heterogeneity$H2_competence_history,
-  "Interview start" = 
+  "Interview realised" = 
     models_y2_heterogeneity$H2_competence_history,
   "Follow-up CAWI" = 
     models_y3_heterogeneity$H2_competence_history
@@ -1751,7 +1904,7 @@ models_h2_comp <- list(
 models_h3_isced <- list(
   "Valid competence-test data" = 
     models_y1_heterogeneity$H3_education,
-  "Interview start" = 
+  "Interview realised" = 
     models_y2_heterogeneity$H3_education,
   "Follow-up CAWI" = 
     models_y3_heterogeneity$H3_education
@@ -1760,7 +1913,7 @@ models_h3_isced <- list(
 models_h4_gender <- list(
   "Valid competence-test data" = 
     models_y1_heterogeneity$H4_gender,
-  "Interview start" = 
+  "Interview realised" = 
     models_y2_heterogeneity$H4_gender,
   "Follow-up CAWI" = 
     models_y3_heterogeneity$H4_gender
@@ -2002,7 +2155,7 @@ model_stability <- list(
     M3 = models_y1$M3_panel_engagement_interaction,
     M6 = models_y1$M6_full_pre_fieldwork
   ),
-  "Interview start" = list(
+  "Interview realised" = list(
     M1 = models_y2$M1_Assignment,
     M3 = models_y2$M3_panel_engagement_interaction,
     M6 = models_y2$M6_full_pre_fieldwork
@@ -2172,13 +2325,13 @@ sens_y1_main <- get_all_pairwise_contrasts(
 sens_y2_full <- get_all_pairwise_contrasts(
   m1_y2_full,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 sens_y2_main <- get_all_pairwise_contrasts(
   m1_y2_main,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 
@@ -2354,13 +2507,13 @@ casmin_y1 <- get_all_pairwise_contrasts(
 isced_y2 <- get_all_pairwise_contrasts(
   m6_y2_isced_common,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 casmin_y2 <- get_all_pairwise_contrasts(
   m6_y2_casmin_common,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 
@@ -2483,13 +2636,13 @@ casmin_H3_y1 <- get_all_pairwise_contrasts(
 isced_H3_y2 <- get_all_pairwise_contrasts(
   H3_y2_isced_common,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 casmin_H3_y2 <- get_all_pairwise_contrasts(
   H3_y2_casmin_common,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 
@@ -2590,13 +2743,13 @@ birthyear_y1 <- get_all_pairwise_contrasts(
 cohort_y2 <- get_all_pairwise_contrasts(
   m6_y2_cohort,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 birthyear_y2 <- get_all_pairwise_contrasts(
   m6_y2_birthyear,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 
@@ -2695,13 +2848,13 @@ probit_y1 <- get_all_pairwise_contrasts(
 logit_y2 <- get_all_pairwise_contrasts(
   m6_y2_logit,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 probit_y2 <- get_all_pairwise_contrasts(
   m6_y2_probit,
   equivalence_margin_pp = 5,
-  outcome_label = "Interview started"
+  outcome_label = "Interview realised"
 )
 
 

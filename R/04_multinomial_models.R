@@ -1,34 +1,78 @@
-# ===
-# Multinomial models for realised testing-interview states
-# Participation and Selectivity in Web-Based Cognitive Testing and Surveying:
-# Evidence from a Randomized Mode Experiment
+####
+# Konstruktion der Experimentalgruppen für das Incentive Experiment 
+# in der B160 (SC4, Welle 17)
 #
-# Requires `00_run_analysis.R`, `R/00_functions.R`, and the common analysis
-# sample created in `R/03_binary_models.R`.
-# ===
+# Vorbereitung Veröffentlichung zur B160
+#
+# Aßmann Christian, Bergrab Michael, Gnambs Timo
+#
+#
+###
+
+# Auswertung des Experiments
+# Modellierung von Multinomial Logit Modellen
+
+
+# In 00 execution master.R
+# Packages
+# Pfade
+# Laden Daten
+
+# Im 00 functions.R
+# sämtliche Funktionen
+
 
 # Daten aufbereiten -------------------------------------------------------
 
-dat_state <- dat_analysis_main %>% 
+# dat_state <- dat_analysis_main %>% 
+#   mutate(
+#     fieldwork_state = case_when(
+#       Y_TBT == 0 & Y_Befragung == 0 ~ "No valid test / no interview",
+#       Y_TBT == 0 & Y_Befragung == 1 ~ "Interview only",
+#       Y_TBT == 1 & Y_Befragung == 1 ~ "Valid test + interview",
+#       TRUE ~ NA_character_
+#     ),
+#     fieldwork_state = factor(
+#       fieldwork_state,
+#       levels = c(
+#         "No valid test / no interview",
+#         "Interview only",
+#         "Valid test + interview"
+#       )
+#     )
+#   )
+# 
+# table(dat_state$fieldwork_state, useNA = "ifany")
+# table(dat_state$Y_TBT, dat_state$Y_Befragung)
+# # korrekt -> Zuteilung passt
+# # es fehlen die 6 ausgeschlossenen Personen
+# 
+# dim(dat_state)
+# 
+# # aber die wenigen unknown Fälle in ISCED bzw. CASMIN führen zu sehr hohen Schätzergebnissen,
+# # daher
+# dat_state_analysis <- dat_state
+
+dat_state <- dat_analysis_main |> 
   mutate(
     fieldwork_state = case_when(
-      Y_TBT == 0 & Y_Befragung == 0 ~ "No valid test / no interview",
-      Y_TBT == 0 & Y_Befragung == 1 ~ "Interview only",
-      Y_TBT == 1 & Y_Befragung == 1 ~ "Valid test + interview",
+      Y_Befragung == 0 ~ "No realised interview",
+      Y_Befragung == 1 & Y_TBT == 0 ~ "Interview without valid test",
+      Y_Befragung == 1 & Y_TBT == 1 ~ "Interivew with valid test",
       TRUE ~ NA_character_
-    ),
-    fieldwork_state = factor(
-      fieldwork_state,
-      levels = c(
-        "No valid test / no interview",
-        "Interview only",
-        "Valid test + interview"
-      )
     )
   )
 
+with(dat_state,
+     table(STARTMODE, fieldwork_state, useNA = "ifany"))
+
 dat_state_analysis <- dat_state
 
+levels_labels_global <- c(
+  "No realised interview",
+  "Interview without valid test",
+  "Interview with valid test"
+)
 
 # Modelle definieren ------------------------------------------------------
 
@@ -85,6 +129,7 @@ rhs_specs <- list(
     "valid_comp_w14"
   )
 )
+
 
 rhs_specs_heterogeneity <- list(
   H1_panel_engagement = c(
@@ -144,17 +189,26 @@ rhs_specs_heterogeneity <- list(
     "valid_comp_w10",
     "status.16",
     "valid_comp_w14",
-    "ISCED_suf"
+    "ISCED"
   )
   
 )
 
 
-outcomes <- c(
-  "No valid test / no interview",
-  "Interview only",
-  "Valid test + interview"
+outcomes <- levels_labels_global
+
+
+# Modellvergleich
+lr_sequence <- tibble::tribble(
+  ~restricted, ~full,
+  "M0_Null", "M1_Assignment",
+  "M1_Assignment", "M2_Panel_history",
+  "M2_Panel_history", "M3_panel_engagement_interaction",
+  "M3_panel_engagement_interaction", "M4_Demography",
+  "M4_Demography", "M5_SocioEco",
+  "M5_SocioEco", "M6_full_pre_fieldwork"
 )
+
 
 
 # Modelle formulieren -----------------------------------------------------
@@ -168,7 +222,7 @@ formulas.multinom <- lapply(rhs_specs, function(vars) {
 
 formulas.multinom[["M0_NULL"]] <- "fieldwork_state ~ 1"
 
-used_variables <- get_all_vars(formulas.multinom$M6_full_pre_fieldwork, dat_state) %>% names()
+used_variables <- get_all_vars(formulas.multinom$M6_full, dat_state) %>% names()
 
 
 
@@ -176,6 +230,17 @@ used_variables <- get_all_vars(formulas.multinom$M6_full_pre_fieldwork, dat_stat
 # Multinomial Models ------------------------------------------------------
 
 # 1. Modelle schätzen -----------------------------------------------------
+
+# Unknown as category
+dim(dat_state_analysis)
+# fits_all <- fit_multinom_set(
+#   formulas = formulas.multinom,
+#   data = dat_state_main,
+#   scenario_label = "Unknown as category"
+# )
+
+levels(dat_state_analysis$ISCED_suf)
+
 
 
 fit_multinomial_logit <- function(formula, data) {
@@ -215,7 +280,7 @@ with(
   table(STARTMODE, status.16, fieldwork_state)
 )
 
-# Convergence
+# Konvergenze
 m_state$M6_full_pre_fieldwork$convergence
 
 is.null(m_state$M6_full_pre_fieldwork$model)
@@ -227,7 +292,7 @@ sapply(
   m_state,
   nobs
 )
-# Expected common analysis sample: N = 4,292.
+# passt. immer gleiche N=4294
 
 
 
@@ -280,7 +345,7 @@ with(
   table(STARTMODE, status.16, fieldwork_state)
 )
 
-# Convergence
+# Konvergenze
 h_state$H2_competence_history$convergence
 
 is.null(h_state$H2_competence_history$model)
@@ -292,7 +357,7 @@ sapply(
   h_state,
   nobs
 )
-# Expected common analysis sample: N = 4,292.
+# passt. immer gleiche N=4294
 
 
 V_robust_H2 <- sandwich::sandwich(h_state$H2_competence_history)
@@ -317,6 +382,16 @@ dim(sandwich::bread(h_state$H4_gender))
 # 2. Prediction -----------------------------------------------------------
 
 # 2.1 overall assignment effects ------------------------------------------
+
+# für Model 6
+# res_state_M6 <- get_multinomial_results(
+#   mod = m_state$M6_full_pre_fieldwork,
+#   model_name = "M6"
+# )
+# 
+# res_state_M6$predictions
+# res_state_M6$contrasts
+
 
 # für alle Modelle
 models_state <- m_state[c(formulas.multinom %>% names())[-length(m_state)]]
@@ -494,7 +569,7 @@ nd_M6 <- make_counterfactual_assignment_data(
 )
 
 table(nd_M6$.assignment_cf)
-# Expected counterfactual rows per assignment level: N = 4,292.
+# passt, jeweisl N=4292
 
 
 
@@ -529,7 +604,7 @@ pairs_STARTMODE <- list(
 )
 
 heterogeneity_state_status.16_M6 <- 
-  multinom_heterogeneity_contrasts(
+  multinom_heteogeneity_contrasts(
     pred_obj = pred_state_status.16_M6_obj,
     moderator = "status.16",
     level1 = "TDO",
@@ -549,6 +624,9 @@ heterogeneity_state_status.16_M6 %>%
   )
 
 all(is.finite(vcov(pred_state_status.16_M6_obj)))
+
+
+
 
 
 
@@ -636,7 +714,7 @@ nd_H2 <- make_counterfactual_assignment_data(
 )
 
 table(nd_H2$.assignment_cf)
-# Expected counterfactual rows per assignment level: N = 4,292.
+# passt, jeweisl N=4292
 
 
 # formale probability-scale Heterogeneity contrasts
@@ -653,7 +731,7 @@ all(is.finite(V_pred_H2))
 
 
 heterogeneity_state_H2 <- 
-  multinom_heterogeneity_contrasts(
+  multinom_heteogeneity_contrasts(
     pred_obj = pred_state_H2_obj,
     moderator = "valid_comp_w14",
     level1 = "1",
@@ -756,7 +834,7 @@ nd_H3 <- make_counterfactual_assignment_data(
 )
 
 table(nd_H3$.assignment_cf)
-# Expected counterfactual rows per assignment level: N = 4,292.
+# passt, jeweisl N=4292
 
 
 # formale probability-scale Heterogeneity contrasts
@@ -773,7 +851,7 @@ all(is.finite(V_pred_H3))
 
 
 heterogeneity_state_H3_34vs02 <- 
-  multinom_heterogeneity_contrasts(
+  multinom_heteogeneity_contrasts(
     pred_obj = pred_state_H3_obj,
     moderator = "ISCED_suf",
     level1 = "3-4",
@@ -787,7 +865,7 @@ heterogeneity_state_H3_34vs02 <-
   )
 
 heterogeneity_state_H3_56vs02 <- 
-  multinom_heterogeneity_contrasts(
+  multinom_heteogeneity_contrasts(
     pred_obj = pred_state_H3_obj,
     moderator = "ISCED_suf",
     level1 = "5-6",
@@ -897,7 +975,7 @@ nd_H4 <- make_counterfactual_assignment_data(
 )
 
 table(nd_H4$.assignment_cf)
-# Expected counterfactual rows per assignment level: N = 4,292.
+# passt, jeweisl N=4292
 
 
 # formale probability-scale Heterogeneity contrasts
@@ -914,7 +992,7 @@ all(is.finite(V_pred_H4))
 
 
 heterogeneity_state_H4 <- 
-  multinom_heterogeneity_contrasts(
+  multinom_heteogeneity_contrasts(
     pred_obj = pred_state_H4_obj,
     moderator = "Gender_suf",
     level1 = "männlich",
@@ -934,7 +1012,7 @@ heterogeneity_state_H4 %>%
   )
 
 
-# 3. Publication tables -----------------------------------------------------
+# 3. schöne Tabellen -----------------------------------------------------
 
 
 # 3.1 M6 status.16 ------------------------------------------------------------------
@@ -1333,7 +1411,7 @@ C12_table <- C12_long %>%
 C12_table
 
 
-# 4. Figures ------------------------------------------------------------
+# 4. Grafiken ------------------------------------------------------------
 
 # 4.1 point-error-bar plot ------------------------------------------------
 # Prob Multinomial M6
@@ -1354,15 +1432,8 @@ plot_prob_M6 <- pred_state_status.16_M6 %>%
 
     state_plot = factor(
       group,
-      levels = c(
-        "No valid test / no interview",
-        "Interview only",
-        "Valid test + interview"),
-      labels = c(
-        "No valid test / no\ninterview start",
-        "Interview start only",
-        "Valid test +\ninterview start"
-      )
+      levels = levels_labels_global,
+      labels = levels_labels_global
     )
   )
 
@@ -1505,15 +1576,8 @@ plot_he_M6 <- heterogeneity_state_status.16_M6 %>%
 
     state_plot = factor(
       group,
-      levels = c(
-        "No valid test / no interview",
-        "Interview only",
-        "Valid test + interview"),
-      labels = c(
-        "No valid test / no\ninterview start",
-        "Interview start only",
-        "Valid test +\ninterview start"
-      )
+      levels = levels_labels_global,
+      labels = levels_labels_global
     )
   )
 
@@ -1562,7 +1626,7 @@ fig_multinom_het_M6 <-
 
   labs(
     x = "Pairwise randomised assignment contrast",
-    y = "Difference in assignment effects\n(TDO - repeat respondets), p.p."
+    y = "Difference in assignment effects\n(TDO - repeat respondents), p.p."
   ) +
 
   theme_article()
@@ -1580,6 +1644,203 @@ ggplot2::ggsave(
   bg = "white",
   dpi = 300
 )
+# 
+# 
+# 
+# 
+# # 2.X weitere Gruppen -----------------------------------------------------
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# # Grafik vorbereiten
+# 
+# pred_state_M6_plot <- pred_state_M6 %>% 
+#   mutate(
+#     group = factor(
+#       group,
+#       levels = c(
+#         "No valid test / no interview",
+#         "Interview only",
+#         "Valid test + interview"
+#       )
+#     )
+#   )
+# 
+# # plotten
+# ggplot2::ggplot(
+#   pred_state_M6_plot,
+#   aes(
+#     x = STARTMODE,
+#     y = estimate,
+#     fill = group
+#   )
+# ) +
+#   ggplot2::geom_col(color = "black") +
+#   ggplot2::scale_fill_grey(start = 0.8, end = 0.3) +
+#   ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#   ggplot2::labs(
+#     x = "Randomized initial assignment",
+#     y = "Predicted probability",
+#     fill = "Fieldwork state"
+#   ) +
+#   ggplot2::theme_minimal()
+# 
+# 
+# 
+# 
+# # Prediction Optional: Gruppen --------------------------------------------
+# 
+# 
+# # Optional: Gruppen
+# 
+# # pred_state_M3_group <- marginaleffects::avg_predictions(
+# #   m_state_M3,
+# #   variables = "STARTMODE",
+# #   by = "status.16",
+# #   type = "probs"
+# # )
+# 
+# pred_state_M3_group <- get_cf_states_by_group(m_state_M3)
+# 
+# levels(pred_state_M3_group$group) <- c("No participation",
+#                                        "Interview only",
+#                                        "Valid test + interview")
+# 
+# levels(pred_state_M3_group$status.16) <- c("Repeat respondents",
+#                                            "Temporary dropouts")
+# 
+# # Konsistenzcheck
+# pred_state_M3_group %>% 
+#   dplyr::group_by(STARTMODE_cf, status.16) %>% 
+#   dplyr::summarise(total = sum(estimate))
+# # check
+# 
+# 
+# # plotten
+# ggplot2::ggplot(
+#   pred_state_M3_group,
+#   aes(
+#     x = STARTMODE_cf,
+#     y = estimate,
+#     fill = group
+#   )
+# ) +
+#   ggplot2::geom_col(position = "stack") +
+#   ggplot2::facet_wrap(~status.16) + 
+#   ggplot2::scale_fill_grey(start = 0.8, end = 0.3) +
+#   ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#   ggplot2::labs(
+#     x = "Randomized initial assignment",
+#     y = "Predicted probability",
+#     fill = "Fieldwork state"
+#   ) +
+#   ggplot2::theme_minimal() +
+#   ggplot2::theme(
+#     text = element_text(size = 11),
+#     axis.title = element_text(size = 11),
+#     legend.title = element_text(size = 11),
+#     legend.text = element_text(size = 10),
+#     strip.text = element_text(size = 10)
+#   )  -> plot_pred_state_M3_group
+# 
+# plot_pred_state_M3_group
+# 
+# # abspeichern
+# ggplot2::ggsave(
+#   plot = plot_pred_state_M3_group,
+#   filename = file.path(path.save, "Prediction multinomial groupwise status16.pdf"),
+#   device = cairo_pdf,
+#   width = 8,
+#   height = 7.3,
+#   units = "in",
+#   dpi = 300
+# )
+# 
+# # weitere Check
+# 
+# pred_state_M3_group %>% 
+#   tidyr::pivot_wider(names_from = group, values_from = estimate)
+# 
+# 
+# 
+# # 2.2 nach Gruppen alle Ergebnisse ----------------------------------------
+# 
+# 
+# # M
+# m_state_M2 <- nnet::multinom(
+#   formulas.multinom$M2_panel_history,
+#   data = dat_state_main,
+#   trace = FALSE
+# )
+# pred_state_M2_group <- get_cf_states_by_group(m_state_M2) %>% 
+#   mutate(Model = "M2")
+# 
+# # M
+# m_state_M4 <- nnet::multinom(
+#   formulas.multinom$M4_Demography,
+#   data = dat_state_main,
+#   trace = FALSE
+# )
+# pred_state_M4_group <- get_cf_states_by_group(m_state_M4) %>% 
+#   mutate(Model = "M4")
+# 
+# 
+# # M
+# m_state_M5 <- nnet::multinom(
+#   formulas.multinom$M5_SocioEco,
+#   data = dat_state_main,
+#   trace = FALSE
+# )
+# pred_state_M5_group <- get_cf_states_by_group(m_state_M5) %>% 
+#   mutate(Model = "M5")
+# 
+# 
+# # M
+# m_state_M6 <- nnet::multinom(
+#   formulas.multinom$M6_full,
+#   data = dat_state_main,
+#   trace = FALSE
+# )
+# pred_state_M6_group <- get_cf_states_by_group(m_state_M6) %>% 
+#   mutate(Model = "M6")
+# 
+# 
+# 
+# 
+# # alles zusammenbinden
+# pred_state_all_group <- pred_state_M3_group %>%
+#   mutate(Model = "M3") %>% 
+#   bind_rows(
+#     pred_state_M4_group,
+#     pred_state_M5_group,
+#     pred_state_M6_group
+# )
+# 
+# pred_state_all_group$Model <- factor(pred_state_all_group$Model)
+# 
+# pred_state_all_group %>% count(Model, STARTMODE_cf, status.16, group) %>% print(n=Inf)
+# 
+# pred_state_all_group  %>% 
+#   pivot_wider(
+#     id_cols = c(Model, STARTMODE_cf),
+#     names_from = c(group, status.16), 
+#     values_from = estimate) %>% 
+#   mutate(
+#     STARTMODE_cf = factor(STARTMODE_cf, levels =c("CAPI","CALVI", "CAWI-TBT+CATI"))
+#   ) %>% 
+#   arrange(Model, STARTMODE_cf) %>% 
+#   mutate(
+#     across(-c(STARTMODE_cf, Model), ~ round(. *100, 1))
+#   ) %>% print(n = Inf)
+# 
+# # Tabelle für APPENDIX
+
 
 
 # 3. Binary multinomial consistency ---------------------------------------
@@ -1619,3 +1880,35 @@ pred_state_all %>%
     M1_M2 = sum(estimate_pct),
     .groups = "drop"
   )
+
+
+# 4. Sensitivität ---------------------------------------------------------
+# 4.1 unknown weglassen ---------------------------------------------------
+
+# unknown as missing / only complete case
+dim(dat_state_main)
+
+# unknown in Variablen migBG, CASMIN, ISCED
+
+table(dat_state_main$migBG, dat_state_main$ISCED) %>% addmargins()
+# 33 + 4 = 37 uncompleted
+4298-37
+# 4261
+
+dat_state_cc <- dat_state_main %>%
+  dplyr::filter(
+    migBG %nin% "missing" &
+      ISCED %nin% "unbekannt") %>%
+  droplevels()
+
+dim(dat_state_cc)
+
+dat_state_cc$migBG %>% table()
+dat_state_cc$ISCED %>% table()
+
+# check: passt
+
+
+
+
+
